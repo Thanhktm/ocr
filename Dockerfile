@@ -14,11 +14,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/python3 /usr/bin/python
 
-# Install PaddlePaddle GPU and dependencies
-RUN pip install --no-cache-dir \
-    paddlepaddle-gpu==3.0.0 \
-    paddleocr \
-    runpod
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Install PaddlePaddle GPU (CUDA 12.3 compatible with 12.1)
+RUN pip install --no-cache-dir paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu123/
+
+# Install other dependencies
+RUN pip install --no-cache-dir paddleocr runpod
 
 # Download and cache the PaddleOCR-VL model during build
 RUN python -c "from paddleocr import PaddleOCRVL; PaddleOCRVL()"
