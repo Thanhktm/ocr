@@ -13,14 +13,14 @@ RUN apt-get update && apt-get install -y \
     && ln -sf /usr/bin/python3.11 /usr/bin/python \
     && ln -sf /usr/bin/python3.11 /usr/bin/python3
 
-# Upgrade pip
-RUN pip install --upgrade pip
+# Install uv for faster package installation
+RUN pip install uv
 
 # Install vLLM nightly (required for PaddleOCR-VL)
-RUN pip install --no-cache-dir -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+RUN uv pip install --system -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
 
 # Install other dependencies
-RUN pip install --no-cache-dir runpod openai
+RUN uv pip install --system runpod openai
 
 # Download model during build to bake into image
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('PaddlePaddle/PaddleOCR-VL')"

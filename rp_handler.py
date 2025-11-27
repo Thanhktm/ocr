@@ -1,13 +1,15 @@
 import runpod
-import base64
 from openai import OpenAI
 
 # Connect to local vLLM server
-client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="not-used")
-MODEL_NAME = "PaddlePaddle/PaddleOCR-VL"
+client = OpenAI(
+    api_key="EMPTY",
+    base_url="http://localhost:8000/v1",
+    timeout=3600
+)
 
-# Available task prompts
-TASK_PROMPTS = {
+# Task-specific base prompts
+TASKS = {
     "ocr": "OCR:",
     "table": "Table Recognition:",
     "formula": "Formula Recognition:",
@@ -36,31 +38,37 @@ def handler(event):
     if not image_base64 and not image_url:
         return {"error": "Please provide either 'image_base64' or 'image_url'"}
 
-    task_prompt = TASK_PROMPTS.get(task, TASK_PROMPTS["ocr"])
+    task_prompt = TASKS.get(task, TASKS["ocr"])
 
     try:
-        # Build image content
+        # Build image URL
         if image_url:
-            image_content = {"type": "image_url", "image_url": {"url": image_url}}
+            img_url = image_url
         else:
-            image_content = {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{image_base64}"},
-            }
+            img_url = f"data:image/png;base64,{image_base64}"
 
-        # Call vLLM API
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": img_url
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": task_prompt
+                    }
+                ]
+            }
+        ]
+
         response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        image_content,
-                        {"type": "text", "text": task_prompt},
-                    ],
-                }
-            ],
-            max_tokens=4096,
+            model="PaddlePaddle/PaddleOCR-VL",
+            messages=messages,
+            temperature=0.0,
         )
 
         result = response.choices[0].message.content
