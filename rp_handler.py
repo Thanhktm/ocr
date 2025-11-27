@@ -1,67 +1,70 @@
 import runpod
 import base64
-import os
-import tempfile
-import subprocess
+from openai import OpenAI
 
-VLLM_SERVER_URL = "http://127.0.0.1:8080/v1"
+# Connect to local vLLM server
+client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="not-used")
+MODEL_NAME = "PaddlePaddle/PaddleOCR-VL"
+
+# Available task prompts
+TASK_PROMPTS = {
+    "ocr": "OCR:",
+    "table": "Table Recognition:",
+    "formula": "Formula Recognition:",
+    "chart": "Chart Recognition:",
+}
 
 
 def handler(event):
     """
-    RunPod serverless handler for PaddleOCR-VL.
+    RunPod serverless handler for PaddleOCR-VL via vLLM.
 
     Input:
         - image_base64: Base64 encoded image string
-        - image_url: URL to download image from (alternative to base64)
+        - image_url: URL of the image
+        - task: "ocr", "table", "formula", or "chart" (default: "ocr")
 
     Output:
-        - result: OCR result in markdown format
+        - result: Extracted text/content from the image
     """
     input_data = event.get("input", {})
 
     image_base64 = input_data.get("image_base64")
     image_url = input_data.get("image_url")
+    task = input_data.get("task", "ocr")
 
     if not image_base64 and not image_url:
         return {"error": "Please provide either 'image_base64' or 'image_url'"}
 
+    task_prompt = TASK_PROMPTS.get(task, TASK_PROMPTS["ocr"])
+
     try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            if image_base64:
-                image_data = base64.b64decode(image_base64)
-                image_path = os.path.join(tmp_dir, "input_image.png")
-                with open(image_path, "wb") as f:
-                    f.write(image_data)
-            else:
-                import urllib.request
-                image_path = os.path.join(tmp_dir, "input_image.png")
-                urllib.request.urlretrieve(image_url, image_path)
+        # Build image content
+        if image_url:
+            image_content = {"type": "image_url", "image_url": {"url": image_url}}
+        else:
+            image_content = {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+            }
 
-            output_dir = os.path.join(tmp_dir, "output")
-            os.makedirs(output_dir, exist_ok=True)
+        # Call vLLM API
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        image_content,
+                        {"type": "text", "text": task_prompt},
+                    ],
+                }
+            ],
+            max_tokens=4096,
+        )
 
-            # Run paddleocr CLI with vLLM backend
-            cmd = [
-                "paddleocr", "doc_parser",
-                "-i", image_path,
-                "--vl_rec_backend", "vllm-server",
-                "--vl_rec_server_url", VLLM_SERVER_URL,
-                "-o", output_dir
-            ]
-
-            result = subprocess.run(cmd, capture_output=True, text=True)
-
-            if result.returncode != 0:
-                return {"error": f"OCR failed: {result.stderr}"}
-
-            # Find and read output markdown
-            md_files = [f for f in os.listdir(output_dir) if f.endswith('.md')]
-            if md_files:
-                with open(os.path.join(output_dir, md_files[0]), "r") as f:
-                    return {"result": f.read()}
-
-            return {"result": result.stdout}
+        result = response.choices[0].message.content
+        return {"result": result}
 
     except Exception as e:
         return {"error": str(e)}

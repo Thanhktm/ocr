@@ -1,6 +1,6 @@
 {
   "input": {
     "image_url": "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.7/doc/imgs_en/img_12.jpg",
-    "output_format": "markdown"
+    "task": "ocr"
   }
 }

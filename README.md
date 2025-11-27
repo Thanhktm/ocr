@@ -1,21 +1,21 @@
 # PaddleOCR-VL RunPod Serverless
 
-A RunPod serverless worker for document OCR using PaddleOCR-VL. The model is baked into the Docker image to reduce cold start time.
+A RunPod serverless worker for document OCR using PaddleOCR-VL via vLLM.
 
 ## Features
 
-- PaddleOCR-VL for high-quality document OCR
-- Supports 109 languages
-- Handles text, tables, formulas, and charts
+- PaddleOCR-VL vision-language model for high-quality OCR
+- vLLM for fast inference
+- Supports OCR, table recognition, formula recognition, and chart recognition
 - Model pre-loaded in Docker image for fast serverless startup
 
 ## Project Structure
 
 ```
 .
-├── rp_handler.py      # Main handler function
-├── requirements.txt   # Python dependencies
-├── Dockerfile         # Container configuration (GPU + model baked in)
+├── rp_handler.py      # RunPod handler (calls vLLM API)
+├── start.sh           # Starts vLLM server + handler
+├── Dockerfile         # CUDA + vLLM + model baked in
 ├── test_input.json    # Local testing input
 └── .runpod/           # RunPod configuration
 ```
@@ -23,7 +23,7 @@ A RunPod serverless worker for document OCR using PaddleOCR-VL. The model is bak
 ## Build & Deploy
 
 ```bash
-# Build image (requires GPU or build on RunPod/cloud)
+# Build image (requires GPU machine or cloud build)
 docker build --platform linux/amd64 -t thanhnokasoft/paddleocr-vl:latest .
 
 # Push to Docker Hub
@@ -37,19 +37,19 @@ docker push thanhnokasoft/paddleocr-vl:latest
 ```json
 {
   "input": {
-    "image_base64": "<base64 encoded image>",
-    "output_format": "markdown"
+    "image_url": "https://example.com/document.png",
+    "task": "ocr"
   }
 }
 ```
 
-Or using URL:
+Or with base64:
 
 ```json
 {
   "input": {
-    "image_url": "https://example.com/document.png",
-    "output_format": "markdown"
+    "image_base64": "<base64 encoded image>",
+    "task": "table"
   }
 }
 ```
@@ -59,13 +59,20 @@ Or using URL:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | image_base64 | string | One of these | Base64 encoded image |
-| image_url | string | required | URL to download image |
-| output_format | string | No | `markdown`, `json`, or `text` (default: `markdown`) |
+| image_url | string | required | URL to image |
+| task | string | No | `ocr`, `table`, `formula`, or `chart` (default: `ocr`) |
+
+### Task Types
+
+- **ocr**: General text extraction
+- **table**: Table structure recognition
+- **formula**: Mathematical formula recognition
+- **chart**: Chart/diagram analysis
 
 ### Response
 
 ```json
 {
-  "result": "# Document Title\n\nExtracted text content..."
+  "result": "Extracted text content..."
 }
 ```
