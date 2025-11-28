@@ -2,13 +2,15 @@ FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
 
 WORKDIR /app
 
-# Install Python and system dependencies
+# Install Python and system dependencies (including python3.11-dev for Python.h)
 RUN apt-get update && apt-get install -y \
     python3.11 \
+    python3.11-dev \
     python3-pip \
     python3.11-venv \
     git \
     curl \
+    build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.11 /usr/bin/python \
     && ln -sf /usr/bin/python3.11 /usr/bin/python3
